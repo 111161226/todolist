@@ -1,10 +1,10 @@
 package service
 
 import (
+	"fmt"
+	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
-
-	"github.com/gin-gonic/gin"
 	database "todolist.go/db"
 )
 
@@ -54,5 +54,139 @@ func ShowTask(ctx *gin.Context) {
 	}
 
 	// Render task
-	ctx.String(http.StatusOK, task.Title)  // Modify it!!
+	//ctx.String(http.StatusOK, task.Title)  // Modify it!!
+	ctx.HTML(http.StatusOK, "task.html", task)
+}
+
+//show register new task form
+func NewTaskForm(ctx *gin.Context) {
+	ctx.HTML(http.StatusOK, "new_task_form.html", gin.H{"Title": "Task registration"})
+}
+
+//register task
+func RegisterTask(ctx *gin.Context) {
+	//Get task title and content
+	title, ex1 := ctx.GetPostForm("title")
+	if !ex1 {
+		Error(http.StatusBadRequest, "No title is given")(ctx)
+		return
+	}
+	content, ex2 := ctx.GetPostForm("content")
+	if !ex2 {
+		Error(http.StatusBadRequest, "No content is given")(ctx)
+		return
+	}
+	//Get DB connection
+	db, err := database.GetConnection()
+	if err != nil {
+		Error(http.StatusInternalServerError, err.Error())(ctx)
+		return
+	}
+	//Create new data with given title on DB
+	result, err := db.Exec("INSERT INTO tasks (title, content) VALUES (?, ?)", title, content)
+	if err != nil {
+		Error(http.StatusInternalServerError, err.Error())(ctx)
+		return
+	}
+	//Render status
+	path := "/list" // task list page for default
+	if id, err := result.LastInsertId(); err == nil {
+		//task id page when the result is correct
+		path = fmt.Sprintf("/task/%d", id)
+	}
+	ctx.Redirect(http.StatusFound, path)
+}
+
+//show edit task form
+func EditTaskForm(ctx *gin.Context) {
+	//get id
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		Error(http.StatusBadRequest, err.Error())(ctx)
+		return
+	}
+	//Get DB connection
+	db, err := database.GetConnection()
+	if err != nil {
+		Error(http.StatusInternalServerError, err.Error())(ctx)
+		return
+	}
+	//Get target task
+	var task database.Task
+	err = db.Get(&task, "SELECT * FROM tasks WHERE id=?", id)
+	if err != nil {
+		Error(http.StatusBadRequest, err.Error())(ctx)
+		return
+	}
+	//Render edit form
+	ctx.HTML(http.StatusOK, "edit_task_form.html",
+		gin.H{"Title": fmt.Sprintf("Edit task %d", task.ID), "Task": task})
+}
+
+//update task
+func UpdateTask(ctx *gin.Context) {
+	//Get task title, is_done, content and id
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		Error(http.StatusBadRequest, err.Error())(ctx)
+		return
+	}
+	title, ex1 := ctx.GetPostForm("title")
+	if !ex1 {
+		Error(http.StatusBadRequest, "No title is given")(ctx)
+		return
+	}
+	content, ex2 := ctx.GetPostForm("content")
+	if !ex2 {
+		Error(http.StatusBadRequest, "No content is given")(ctx)
+		return
+	}
+	done, ex3 := ctx.GetPostForm("is_done")
+	if !ex3 {
+		Error(http.StatusBadRequest, "No is_done is given")(ctx)
+		return
+	}
+	is_done, err := strconv.ParseBool(done)
+	if err != nil {
+		Error(http.StatusBadRequest, err.Error())(ctx)
+		return
+	}
+	//Get DB connection
+	db, err := database.GetConnection()
+	if err != nil {
+		Error(http.StatusInternalServerError, err.Error())(ctx)
+		return
+	}
+	//update data with given title on DB
+	_, err = db.Exec("UPDATE tasks SET title = ?, content = ?, is_done = ? WHERE id = ?", title, content, is_done, id)
+	if err != nil {
+		Error(http.StatusInternalServerError, err.Error())(ctx)
+		return
+	}
+	path := fmt.Sprintf("/task/%d", id)
+	ctx.Redirect(http.StatusFound, path)
+}
+
+//delete the selected task
+func DeleteTask(ctx *gin.Context) {
+	//get ID
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		Error(http.StatusBadRequest, err.Error())(ctx)
+		return
+	}
+	//Get DB connection
+	db, err := database.GetConnection()
+	if err != nil {
+		Error(http.StatusInternalServerError, err.Error())(ctx)
+		return
+	}
+	//Delete the task from DB
+	_, err = db.Exec("DELETE FROM tasks WHERE id=?", id)
+	if err != nil {
+		Error(http.StatusInternalServerError, err.Error())(ctx)
+		return
+	}
+	//Redirect to /list
+	ctx.Redirect(http.StatusFound, "/list")
 }
