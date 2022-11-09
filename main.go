@@ -44,6 +44,10 @@ func main() {
 	//delete the task
 	engine.GET("/task/delete/:id", service.DeleteTask)
 
+	//register user
+    engine.GET("/user/new", service.NewUserForm)
+    engine.POST("/user/new", service.RegisterUser)
+
 	// start server
 	engine.Run(fmt.Sprintf(":%d", port))
 }

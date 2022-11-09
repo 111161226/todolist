@@ -2,9 +2,10 @@ package service
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 	database "todolist.go/db"
 )
 
@@ -17,16 +18,32 @@ func TaskList(ctx *gin.Context) {
 		return
 	}
 
+	// Get query parameter
+    kw := ctx.Query("kw")
+	// Get is_done or not is_done
+	is_done := ctx.Query("is_done")
+
 	// Get tasks in DB
 	var tasks []database.Task
-	err = db.Select(&tasks, "SELECT * FROM tasks") // Use DB#Select for multiple entries
+	switch {
+		case kw != "":
+			if is_done != "" {
+				err = db.Select(&tasks, "SELECT * FROM tasks WHERE title LIKE ? AND is_done = ?", "%" + kw + "%", is_done=="済")
+			} else {
+				err = db.Select(&tasks, "SELECT * FROM tasks WHERE title LIKE ?", "%" + kw + "%")
+			}
+		case is_done!="":
+			err = db.Select(&tasks, "SELECT * FROM tasks WHERE is_done = ?", is_done=="済")
+		default:
+			err = db.Select(&tasks, "SELECT * FROM tasks")
+    }
 	if err != nil {
 		Error(http.StatusInternalServerError, err.Error())(ctx)
 		return
 	}
 
 	// Render tasks
-	ctx.HTML(http.StatusOK, "task_list.html", gin.H{"Title": "Task list", "Tasks": tasks})
+	ctx.HTML(http.StatusOK, "task_list.html", gin.H{"Title": "Task list", "Tasks": tasks, "Kw": kw})
 }
 
 // ShowTask renders a task with given ID

@@ -13,3 +13,11 @@ type Task struct {
 	CreatedAt time.Time `db:"created_at"`
 	IsDone    bool      `db:"is_done"`
 }
+
+// User corresponds to 
+type User struct {
+    ID        uint64    `db:"id"`
+    Name      string    `db:"name"`
+    Password  []byte    `db:"password"`
+	Updated_at time.Time `db:"updated_at"`
+}
