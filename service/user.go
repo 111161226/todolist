@@ -65,7 +65,7 @@ func RegisterUser(ctx *gin.Context) {
                 }
             }
             if(!(num && big && small)) {
-                ctx.HTML(http.StatusBadRequest, "new_user_form.html", gin.H{"Title": "Register user", "Error": "Password doesn't include all these(number, uppercase and lowercase letter", "Username": username, "Password": password, "Pass_con":pass_con})
+                ctx.HTML(http.StatusBadRequest, "new_user_form.html", gin.H{"Title": "Register user", "Error": "Password doesn't include all these(number, uppercase and lowercase letter)", "Username": username, "Password": password, "Pass_con":pass_con})
                 return
             }        
     }
