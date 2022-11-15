@@ -23,5 +23,8 @@ down:
 fmt:
 	@$(CMD) exec app go fmt ./...
 
+add:
+	@$(CMD) exec app go get github.com/gin-contrib/sessions
+
 clean:
 	@$(CMD) down --rmi all --volumes --remove-orphans

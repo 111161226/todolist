@@ -6,11 +6,13 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-contrib/sessions"
 	database "todolist.go/db"
 )
 
 // TaskList renders list of tasks in DB
 func TaskList(ctx *gin.Context) {
+	userID := sessions.Default(ctx).Get("user")
 	// Get DB connection
 	db, err := database.GetConnection()
 	if err != nil {
@@ -25,17 +27,19 @@ func TaskList(ctx *gin.Context) {
 
 	// Get tasks in DB
 	var tasks []database.Task
+	query := "SELECT id, title, created_at, is_done, content FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ?"
 	switch {
 		case kw != "":
 			if is_done != "" {
-				err = db.Select(&tasks, "SELECT * FROM tasks WHERE title LIKE ? AND is_done = ?", "%" + kw + "%", is_done=="済")
+				err = db.Select(&tasks, /*"SELECT * FROM tasks WHERE title LIKE ? AND is_done = ?"*/
+				query + " AND title LIKE ? AND is_done = ?", userID, "%" + kw + "%", is_done=="済")
 			} else {
-				err = db.Select(&tasks, "SELECT * FROM tasks WHERE title LIKE ?", "%" + kw + "%")
+				err = db.Select(&tasks,query + " AND title LIKE ?" , userID, "%" + kw + "%")
 			}
 		case is_done!="":
-			err = db.Select(&tasks, "SELECT * FROM tasks WHERE is_done = ?", is_done=="済")
+			err = db.Select(&tasks, query + " AND is_done = ?", userID, is_done=="済")
 		default:
-			err = db.Select(&tasks, "SELECT * FROM tasks")
+			err = db.Select(&tasks, query, userID)
     }
 	if err != nil {
 		Error(http.StatusInternalServerError, err.Error())(ctx)
@@ -48,6 +52,8 @@ func TaskList(ctx *gin.Context) {
 
 // ShowTask renders a task with given ID
 func ShowTask(ctx *gin.Context) {
+	//get user id to distinguish user task
+	userID := sessions.Default(ctx).Get("user")
 	// Get DB connection
 	db, err := database.GetConnection()
 	if err != nil {
@@ -64,7 +70,8 @@ func ShowTask(ctx *gin.Context) {
 
 	// Get a task with given ID
 	var task database.Task
-	err = db.Get(&task, "SELECT * FROM tasks WHERE id=?", id) // Use DB#Get for one entry
+	query := "SELECT id, title, created_at, is_done, content FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ? AND id = ?"
+	err = db.Get(&task, query, userID, id) // Use DB#Get for one entry
 	if err != nil {
 		Error(http.StatusBadRequest, err.Error())(ctx)
 		return
@@ -82,6 +89,8 @@ func NewTaskForm(ctx *gin.Context) {
 
 //register task
 func RegisterTask(ctx *gin.Context) {
+	//get user id
+	userID := sessions.Default(ctx).Get("user")
 	//Get task title and content
 	title, ex1 := ctx.GetPostForm("title")
 	if !ex1 {
@@ -99,12 +108,30 @@ func RegisterTask(ctx *gin.Context) {
 		Error(http.StatusInternalServerError, err.Error())(ctx)
 		return
 	}
+
+	tx := db.MustBegin()
 	//Create new data with given title on DB
-	result, err := db.Exec("INSERT INTO tasks (title, content) VALUES (?, ?)", title, content)
+	result, err := tx.Exec("INSERT INTO tasks (title, content) VALUES (?, ?)", title, content)
 	if err != nil {
 		Error(http.StatusInternalServerError, err.Error())(ctx)
 		return
 	}
+	//get task id
+	taskID, err := result.LastInsertId()
+    if err != nil {
+        tx.Rollback()
+        Error(http.StatusInternalServerError, err.Error())(ctx)
+        return
+    }
+	//preserve user and task id  to ownership
+	_, err = tx.Exec("INSERT INTO ownership (user_id, task_id) VALUES (?, ?)", userID, taskID)
+    if err != nil {
+        tx.Rollback()
+        Error(http.StatusInternalServerError, err.Error())(ctx)
+        return
+    }
+    tx.Commit()
+
 	//Render status
 	path := "/list" // task list page for default
 	if id, err := result.LastInsertId(); err == nil {
@@ -116,6 +143,8 @@ func RegisterTask(ctx *gin.Context) {
 
 //show edit task form
 func EditTaskForm(ctx *gin.Context) {
+	//get user id to distinguish user task
+	userID := sessions.Default(ctx).Get("user")
 	//get id
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
@@ -130,7 +159,8 @@ func EditTaskForm(ctx *gin.Context) {
 	}
 	//Get target task
 	var task database.Task
-	err = db.Get(&task, "SELECT * FROM tasks WHERE id=?", id)
+	query := "SELECT id, title, created_at, is_done, content FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ? AND id = ?"
+	err = db.Get(&task, query, userID, id)
 	if err != nil {
 		Error(http.StatusBadRequest, err.Error())(ctx)
 		return
@@ -186,6 +216,8 @@ func UpdateTask(ctx *gin.Context) {
 
 //delete the selected task
 func DeleteTask(ctx *gin.Context) {
+	//get user id to distinguish user task
+	userID := sessions.Default(ctx).Get("user")
 	//get ID
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
@@ -199,7 +231,8 @@ func DeleteTask(ctx *gin.Context) {
 		return
 	}
 	//Delete the task from DB
-	_, err = db.Exec("DELETE FROM tasks WHERE id=?", id)
+	query := "DELETE FROM tasks WHERE id IN  (SELECT task_id FROM ownership WHERE user_id = ? AND task_id = ?)"
+	_, err = db.Exec(query, userID, id)
 	if err != nil {
 		Error(http.StatusInternalServerError, err.Error())(ctx)
 		return

@@ -1,0 +1,10 @@
+{{ template "header" . }}
+<h1>Task: {{ .Title }}</h1>
+<form action="/task/share/{{ .Task.ID }}" method="POST" onSubmit="return confirm_share({{ .Task.ID }})">
+    <label>ユーザー名</label>
+    <input type="text" name="user_name" required>
+    <br>
+    <input type="submit" value="共有">
+    <a href="/list"><button type="button">リストへ戻る</button></a>
+</form>
+{{ template "footer" }}
