@@ -231,12 +231,21 @@ func DeleteTask(ctx *gin.Context) {
 		return
 	}
 	//Delete the task from DB
+	tx := db.MustBegin()
 	query := "DELETE FROM tasks WHERE id IN  (SELECT task_id FROM ownership WHERE user_id = ? AND task_id = ?)"
-	_, err = db.Exec(query, userID, id)
+	_, err = tx.Exec(query, userID, id)
 	if err != nil {
+		tx.Rollback()
 		Error(http.StatusInternalServerError, err.Error())(ctx)
 		return
 	}
+	_, err = tx.Exec("DELETE FROM ownership WHERE user_id = ? AND task_id = ?", userID, id)
+	if err != nil {
+		tx.Rollback()
+		Error(http.StatusInternalServerError, err.Error())(ctx)
+		return
+	}
+	tx.Commit()
 	//Redirect to /list
 	ctx.Redirect(http.StatusFound, "/list")
 }
