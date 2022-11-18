@@ -240,3 +240,78 @@ func DeleteTask(ctx *gin.Context) {
 	//Redirect to /list
 	ctx.Redirect(http.StatusFound, "/list")
 }
+
+//show share task form
+func CommonTaskForm(ctx *gin.Context) {
+	//get user id to distinguish user task
+	userID := sessions.Default(ctx).Get("user")
+	//get id
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		Error(http.StatusBadRequest, err.Error())(ctx)
+		return
+	}
+	//Get DB connection
+	db, err := database.GetConnection()
+	if err != nil {
+		Error(http.StatusInternalServerError, err.Error())(ctx)
+		return
+	}
+	//Get target task
+	var task database.Task
+	query := "SELECT id, title, content FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ? AND id = ?"
+	err = db.Get(&task, query, userID, id)
+	if err != nil {
+		Error(http.StatusBadRequest, err.Error())(ctx)
+		return
+	}
+	//Render edit form
+	ctx.HTML(http.StatusOK, "share_task_form.html",
+		gin.H{"Title": task.Title, "Content": task.Content, "ID": task.ID})
+}
+
+//share task to other people
+func ShareTask(ctx *gin.Context) {
+	//get user id to distinguish user task
+	userID := sessions.Default(ctx).Get("user")
+	//get id
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		Error(http.StatusBadRequest, err.Error())(ctx)
+		return
+	}
+	user_name, ex1 := ctx.GetPostForm("user_name")
+	if !ex1 {
+		Error(http.StatusBadRequest, "No user_name is given")(ctx)
+		return
+	}
+	//Get DB connection
+	db, err := database.GetConnection()
+	if err != nil {
+		Error(http.StatusInternalServerError, err.Error())(ctx)
+		return
+	}
+	//check user_id is present
+	var user_id int
+    err = db.Get(&user_id, "SELECT id FROM users WHERE name=?", user_name)
+	if err != nil {
+		//Get target task
+		var task database.Task
+		query := "SELECT id, title, content FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ? AND id = ?"
+		err = db.Get(&task, query, userID, id)
+		if err != nil {
+			Error(http.StatusBadRequest, err.Error())(ctx)
+			return
+		}
+        ctx.HTML(http.StatusBadRequest, "share_task_form.html", gin.H{"Error": "Username is invalid", "ID" : id, "Title" : task.Title, "Content" : task.Content})
+        return
+    }
+	//register task to designated user
+	_, err = db.Exec("INSERT INTO ownership (user_id, task_id) VALUES (?, ?)", user_id, id)
+	if err != nil {
+        Error(http.StatusInternalServerError, err.Error())(ctx)
+        return
+    }
+	//Render status
+	ctx.Redirect(http.StatusFound, fmt.Sprintf("/task/%d", id))
+}

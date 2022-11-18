@@ -53,6 +53,8 @@ func main() {
         taskGroup.GET("/edit/:id", service.EditTaskForm)
         taskGroup.POST("/edit/:id", service.UpdateTask)
         taskGroup.GET("/delete/:id", service.DeleteTask)
+		taskGroup.GET("/share/:id", service.CommonTaskForm)
+		taskGroup.POST("/share/:id", service.ShareTask)
     }
 
 	//register user

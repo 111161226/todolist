@@ -1,7 +1,11 @@
 {{ template "header" . }}
 <h1>Task: {{ .Title }}</h1>
-<form action="/task/share/{{ .Task.ID }}" method="POST" onSubmit="return confirm_share({{ .Task.ID }})">
-    <label>ユーザー名</label>
+<p>内容: {{ .Content }}</p>
+{{ if .Error }}
+<p><font color="#FF0000">{{ .Error }}</font></p>
+{{ end }}
+<form action="/task/share/{{ .ID }}" method="POST" onSubmit="return confirm_share({{ .ID }})">
+    <label>共有するユーザー：</label>
     <input type="text" name="user_name" required>
     <br>
     <input type="submit" value="共有">

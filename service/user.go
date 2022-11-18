@@ -105,7 +105,7 @@ func RegisterUser(ctx *gin.Context) {
     //confirm state of preservation
     id, _ := result.LastInsertId()
     var user database.User
-    err = db.Get(&user, "SELECT id, name, password, updated_at FROM users WHERE id = ?", id)
+    err = db.Get(&user, "SELECT id, name, password FROM users WHERE id = ?", id)
     if err != nil {
         Error(http.StatusInternalServerError, err.Error())(ctx)
         return
@@ -227,28 +227,29 @@ func EditUserForm(ctx *gin.Context) {
 	}
 	//Get target task
 	var user database.User
-	query := "SELECT name, password FROM users WHERE id = ?"
+	query := "SELECT name FROM users WHERE id = ?"
 	err = db.Get(&user, query, userID)
 	if err != nil {
 		Error(http.StatusBadRequest, err.Error())(ctx)
 		return
 	}
 	//Render edit form
-	ctx.HTML(http.StatusOK, "edit_user_form.html",
-		gin.H{"User": user})
+	ctx.HTML(http.StatusOK, "edit_user_form.html", gin.H{"Name": user.Name})
 }
 
 //update user information
 func UpdateUser(ctx *gin.Context) {
+    //get user id to distinguish user 
+	userID := sessions.Default(ctx).Get("user")
     //Get user name and password
-	user_name, err := ctx.GetPostForm("user_name")
-	if err != nil {
-		Error(http.StatusBadRequest, err.Error())(ctx)
+	user_name, ex1 := ctx.GetPostForm("user_name")
+	if !ex1 {
+		Error(http.StatusBadRequest, "No username is given")(ctx)
 		return
 	}
-	password, ex1 := ctx.GetPostForm("password")
-	if !ex1 {
-		Error(http.StatusBadRequest, "No title is given")(ctx)
+	password, ex2 := ctx.GetPostForm("password")
+	if !ex2 {
+		Error(http.StatusBadRequest, "No password is given")(ctx)
 		return
 	}
 
@@ -258,8 +259,19 @@ func UpdateUser(ctx *gin.Context) {
 		Error(http.StatusInternalServerError, err.Error())(ctx)
 		return
 	}
+    //check user duplicate
+    var duplicate int
+    err = db.Get(&duplicate, "SELECT COUNT(*) FROM users WHERE name=? and id != ?", user_name, userID)
+    if err != nil {
+        Error(http.StatusInternalServerError, err.Error())(ctx)
+        return
+    }
+    if duplicate > 0 {
+        ctx.HTML(http.StatusBadRequest, "edit_user_form.html", gin.H{"Error": "Username is already taken", "Name": user_name, "Password": password})
+        return
+    }
 	//update data with given title on DB
-	_, err = db.Exec("UPDATE users SET name = ?, password = ? WHERE name = ? AND password = ?", user_name, passward)
+	_, err = db.Exec("UPDATE users SET name = ?, password = ? WHERE id = ?", user_name, hash(password), userID)
 	if err != nil {
 		Error(http.StatusInternalServerError, err.Error())(ctx)
 		return
