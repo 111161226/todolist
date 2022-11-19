@@ -1,5 +1,5 @@
 {{ template "header" . }}
-<h1>ユーザー情報</h1>
+<h1>ユーザー情報変更</h1>
 {{ if .Error }}
 <p><font color="#FF0000">{{ .Error }}</font></p>
 {{ end }}
@@ -8,7 +8,7 @@
     <input type="text" name="user_name" value="{{ .Name }}" required>
     <br>
     <label>パスワード</label>
-    <input type="password" name="password" required>
+    <input type="password" name="password" placeholder="8字以上半角英数字" pattern="[a-zA-Z0-9]+" required>
     <br>
     <input type="submit" value="更新">
   <!--  <button type="button" onclick="confirm_update({{ .Task.ID }})">登録</button> -->

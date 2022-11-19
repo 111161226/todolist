@@ -301,8 +301,9 @@ func ShareTask(ctx *gin.Context) {
 		return
 	}
 	//check user_id is present
+	tx := db.MustBegin()
 	var user_id int
-    err = db.Get(&user_id, "SELECT id FROM users WHERE name=?", user_name)
+    err = tx.Get(&user_id, "SELECT id FROM users WHERE name=?", user_name)
 	if err != nil {
 		//Get target task
 		var task database.Task
@@ -312,15 +313,18 @@ func ShareTask(ctx *gin.Context) {
 			Error(http.StatusBadRequest, err.Error())(ctx)
 			return
 		}
+		tx.Rollback()
         ctx.HTML(http.StatusBadRequest, "share_task_form.html", gin.H{"Error": "Username is invalid", "ID" : id, "Title" : task.Title, "Content" : task.Content})
         return
     }
 	//register task to designated user
-	_, err = db.Exec("INSERT INTO ownership (user_id, task_id) VALUES (?, ?)", user_id, id)
+	_, err = tx.Exec("INSERT INTO ownership (user_id, task_id) VALUES (?, ?)", user_id, id)
 	if err != nil {
+		tx.Rollback()
         Error(http.StatusInternalServerError, err.Error())(ctx)
         return
     }
 	//Render status
+	tx.Commit()
 	ctx.Redirect(http.StatusFound, fmt.Sprintf("/task/%d", id))
 }

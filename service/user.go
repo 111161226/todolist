@@ -260,21 +260,53 @@ func UpdateUser(ctx *gin.Context) {
 		return
 	}
     //check user duplicate
+    tx := db.MustBegin()
     var duplicate int
-    err = db.Get(&duplicate, "SELECT COUNT(*) FROM users WHERE name=? and id != ?", user_name, userID)
+    err = tx.Get(&duplicate, "SELECT COUNT(*) FROM users WHERE name=? and id != ?", user_name, userID)
     if err != nil {
+        tx.Rollback()
         Error(http.StatusInternalServerError, err.Error())(ctx)
         return
     }
     if duplicate > 0 {
+        tx.Rollback()
         ctx.HTML(http.StatusBadRequest, "edit_user_form.html", gin.H{"Error": "Username is already taken", "Name": user_name, "Password": password})
         return
     }
+    //check password is correct and has enough security
+    en_len := 8
+    switch {
+        case len(password) < en_len:
+            ctx.HTML(http.StatusBadRequest, "edit_user_form.html", gin.H{"Error": "Password doesn't have enough length", "Name": user_name, "Password": password})
+            return
+        default:
+            //check security
+            upperA := rune('A')
+            upperZ := rune('Z')
+            lowerA := rune('a')
+            lowerZ := rune('z')
+            small, big, num := false, false, false
+            for  _, str := range(password) {
+                if '0' <= str && str <= '9' {
+                    num = true
+                } else if upperA <= str && str <= upperZ{
+                    big = true
+                } else if lowerA <= str && str <= lowerZ{
+                    small = true
+                }
+            }
+            if(!(num && big && small)) {
+                ctx.HTML(http.StatusBadRequest, "edit_user_form.html", gin.H{"Error": "Password doesn't include all these(number, uppercase and lowercase letter)", "Name": user_name, "Password": password})
+                return
+            }        
+    }
 	//update data with given title on DB
-	_, err = db.Exec("UPDATE users SET name = ?, password = ? WHERE id = ?", user_name, hash(password), userID)
+	_, err = tx.Exec("UPDATE users SET name = ?, password = ? WHERE id = ?", user_name, hash(password), userID)
 	if err != nil {
+        tx.Rollback()
 		Error(http.StatusInternalServerError, err.Error())(ctx)
 		return
 	}
+    tx.Commit()
 	ctx.Redirect(http.StatusFound, "/list")
 }
