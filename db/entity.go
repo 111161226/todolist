@@ -12,6 +12,7 @@ type Task struct {
 	Content   string    `db:"content"`
 	CreatedAt time.Time `db:"created_at"`
 	IsDone    bool      `db:"is_done"`
+	Priority  uint64    `db:"priority"`
 }
 
 // User corresponds to 

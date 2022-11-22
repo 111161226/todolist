@@ -9,6 +9,8 @@
     <dd>{{ .Content}}</dd>
     <dt>Status</dt>
     <dd><input type="checkbox" {{ if .IsDone }}checked {{ end }}disabled/>済</dd>
+    <dt>Priority</dt>
+    <dd>{{ .Priority}}</dd>
 </dl>
 <a href="/list"><button type="button">リストへ戻る</button></a>
 <a href="/task/edit/{{ .ID }}"><button type="button">編集</button></a>

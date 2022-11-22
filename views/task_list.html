@@ -8,6 +8,10 @@
     <input type="radio" name="is_done" value="済"><label>済</label>
     <input type="radio" name="is_done" value="未完"><label>未完</label>
     <br>
+    <label>優先度:</label>
+    <input type="radio" name="priority" value="priority"><label>ソートあり</label>
+    <input type="radio" name="priority" value=""><label>ソートなし</label>
+    <br>
     <input type="submit" value="検索">
 </form>
 <p><a href="/task/new">新規登録</a></p>
@@ -18,13 +22,14 @@
 {{ if not .Tasks }}
 <p>登録データがありません．</p>
 {{ else }}
-<table border="4">
+<table border="5">
     <tr valign="top">
         <th bgcolor="#ff0000" width="50" height="30">ID</th>
         <th bgcolor="#0000ff" width="200" height="30">タイトル</th>
         <th bgcolor="#00ffff" width="200" height="30">内容</th>
         <th bgcolor="#c0c0c0" width="200" height="30">登録日</th>
         <th width="50" height="30">状態</th>
+        <th bgcolor="#00ff00" width="50" height="30">優先度</th>
     </tr>
     {{ range $task := .Tasks }}
     <tr>
@@ -33,6 +38,7 @@
         <td>{{ $task.Content }}</td>
         <td>{{ $task.CreatedAt }}</td>
         <td>{{ if $task.IsDone }}済{{ end }}</td>
+        <td>{{ $task.Priority}}</td>
     </tr>
     {{ end }}
 </table>

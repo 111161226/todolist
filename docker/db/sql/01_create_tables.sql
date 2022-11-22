@@ -7,6 +7,7 @@ CREATE TABLE `tasks` (
     `content` varchar(256) NOT NULL DEFAULT 'todo assignment',
     `is_done` boolean NOT NULL DEFAULT b'0',
     `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `priority` bigint(20) NOT NULL DEFAULT 1,
     PRIMARY KEY (`id`)
 ) DEFAULT CHARSET=utf8mb4;
 

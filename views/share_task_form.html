@@ -1,6 +1,7 @@
 {{ template "header" . }}
 <h1>Task: {{ .Title }}</h1>
 <p>内容: {{ .Content }}</p>
+<h2>Priority: {{.Priority}}</h2>
 {{ if .Error }}
 <p><font color="#FF0000">{{ .Error }}</font></p>
 {{ end }}

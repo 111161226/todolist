@@ -24,10 +24,12 @@ func TaskList(ctx *gin.Context) {
     kw := ctx.Query("kw")
 	// Get is_done or not is_done
 	is_done := ctx.Query("is_done")
+	//Get priority sort parameter
+	prior := ctx.Query("priority")
 
 	// Get tasks in DB
 	var tasks []database.Task
-	query := "SELECT id, title, created_at, is_done, content FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ?"
+	query := "SELECT id, title, created_at, is_done, content, priority FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ?"
 	switch {
 		case kw != "":
 			if is_done != "" {
@@ -38,6 +40,8 @@ func TaskList(ctx *gin.Context) {
 			}
 		case is_done!="":
 			err = db.Select(&tasks, query + " AND is_done = ?", userID, is_done=="済")
+		case prior!="":
+			err = db.Select(&tasks, query + " ORDER BY priority DESC", userID)
 		default:
 			err = db.Select(&tasks, query, userID)
     }
@@ -70,7 +74,7 @@ func ShowTask(ctx *gin.Context) {
 
 	// Get a task with given ID
 	var task database.Task
-	query := "SELECT id, title, created_at, is_done, content FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ? AND id = ?"
+	query := "SELECT id, title, created_at, is_done, content, priority FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ? AND id = ?"
 	err = db.Get(&task, query, userID, id) // Use DB#Get for one entry
 	if err != nil {
 		Error(http.StatusBadRequest, err.Error())(ctx)
@@ -102,6 +106,16 @@ func RegisterTask(ctx *gin.Context) {
 		Error(http.StatusBadRequest, "No content is given")(ctx)
 		return
 	}
+	prior, ex3 := ctx.GetPostForm("priority")
+	if !ex3 {
+		Error(http.StatusBadRequest, "No priority is given")(ctx)
+		return
+	}
+	priority, ex4 := strconv.Atoi(prior)
+	if ex4 != nil {
+		Error(http.StatusBadRequest, ex4.Error())(ctx)
+		return
+	} 
 	//Get DB connection
 	db, err := database.GetConnection()
 	if err != nil {
@@ -111,7 +125,7 @@ func RegisterTask(ctx *gin.Context) {
 
 	tx := db.MustBegin()
 	//Create new data with given title on DB
-	result, err := tx.Exec("INSERT INTO tasks (title, content) VALUES (?, ?)", title, content)
+	result, err := tx.Exec("INSERT INTO tasks (title, content, priority) VALUES (?, ?, ?)", title, content, priority)
 	if err != nil {
 		Error(http.StatusInternalServerError, err.Error())(ctx)
 		return
@@ -159,7 +173,7 @@ func EditTaskForm(ctx *gin.Context) {
 	}
 	//Get target task
 	var task database.Task
-	query := "SELECT id, title, created_at, is_done, content FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ? AND id = ?"
+	query := "SELECT id, title, created_at, is_done, content, priority FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ? AND id = ?"
 	err = db.Get(&task, query, userID, id)
 	if err != nil {
 		Error(http.StatusBadRequest, err.Error())(ctx)
@@ -198,6 +212,16 @@ func UpdateTask(ctx *gin.Context) {
 		Error(http.StatusBadRequest, err.Error())(ctx)
 		return
 	}
+	prior, ex4 := ctx.GetPostForm("priority")
+	if !ex4 {
+		Error(http.StatusBadRequest, "No priority is given")(ctx)
+		return
+	}
+	priority, ex5 := strconv.Atoi(prior)
+	if ex5 != nil {
+		Error(http.StatusBadRequest, ex5.Error())(ctx)
+		return
+	} 
 	//Get DB connection
 	db, err := database.GetConnection()
 	if err != nil {
@@ -205,7 +229,7 @@ func UpdateTask(ctx *gin.Context) {
 		return
 	}
 	//update data with given title on DB
-	_, err = db.Exec("UPDATE tasks SET title = ?, content = ?, is_done = ? WHERE id = ?", title, content, is_done, id)
+	_, err = db.Exec("UPDATE tasks SET title = ?, content = ?, is_done = ?, priority = ? WHERE id = ?", title, content, is_done, priority, id)
 	if err != nil {
 		Error(http.StatusInternalServerError, err.Error())(ctx)
 		return
@@ -268,7 +292,7 @@ func CommonTaskForm(ctx *gin.Context) {
 	}
 	//Get target task
 	var task database.Task
-	query := "SELECT id, title, content FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ? AND id = ?"
+	query := "SELECT id, title, content, priority FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ? AND id = ?"
 	err = db.Get(&task, query, userID, id)
 	if err != nil {
 		Error(http.StatusBadRequest, err.Error())(ctx)
@@ -276,7 +300,7 @@ func CommonTaskForm(ctx *gin.Context) {
 	}
 	//Render edit form
 	ctx.HTML(http.StatusOK, "share_task_form.html",
-		gin.H{"Title": task.Title, "Content": task.Content, "ID": task.ID})
+		gin.H{"Title": task.Title, "Content": task.Content, "ID": task.ID, "Priority": task.Priority})
 }
 
 //share task to other people
@@ -307,14 +331,15 @@ func ShareTask(ctx *gin.Context) {
 	if err != nil {
 		//Get target task
 		var task database.Task
-		query := "SELECT id, title, content FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ? AND id = ?"
+		query := "SELECT id, title, content, priority FROM tasks INNER JOIN ownership ON task_id = id WHERE user_id = ? AND id = ?"
 		err = db.Get(&task, query, userID, id)
 		if err != nil {
 			Error(http.StatusBadRequest, err.Error())(ctx)
 			return
 		}
 		tx.Rollback()
-        ctx.HTML(http.StatusBadRequest, "share_task_form.html", gin.H{"Error": "Username is invalid", "ID" : id, "Title" : task.Title, "Content" : task.Content})
+        ctx.HTML(http.StatusBadRequest, "share_task_form.html", 
+		        gin.H{"Error": "Username is invalid", "ID" : id, "Title" : task.Title, "Content" : task.Content, "Priority" : task.Priority})
         return
     }
 	//register task to designated user
