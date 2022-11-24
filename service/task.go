@@ -186,6 +186,8 @@ func EditTaskForm(ctx *gin.Context) {
 
 //update task
 func UpdateTask(ctx *gin.Context) {
+	//get user id to distinguish user task
+	userID := sessions.Default(ctx).Get("user")
 	//Get task title, is_done, content and id
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
@@ -228,12 +230,28 @@ func UpdateTask(ctx *gin.Context) {
 		Error(http.StatusInternalServerError, err.Error())(ctx)
 		return
 	}
+	tx := db.MustBegin()
 	//update data with given title on DB
-	_, err = db.Exec("UPDATE tasks SET title = ?, content = ?, is_done = ?, priority = ? WHERE id = ?", title, content, is_done, priority, id)
+	//check task is present
+    var cnt int
+    err = tx.Get(&cnt, "SELECT COUNT(*) FROM ownership WHERE user_id=? AND task_id=?", userID, id)
+    if err != nil {
+		tx.Rollback()
+        Error(http.StatusInternalServerError, err.Error())(ctx)
+        return
+    }
+    if cnt == 0 {
+		tx.Rollback()
+        Error(http.StatusBadRequest, "No task")(ctx)
+        return
+    }
+	_, err = tx.Exec("UPDATE tasks SET title = ?, content = ?, is_done = ?, priority = ? WHERE id = ?", title, content, is_done, priority, id)
 	if err != nil {
+		tx.Rollback()
 		Error(http.StatusInternalServerError, err.Error())(ctx)
 		return
 	}
+	tx.Commit()
 	path := fmt.Sprintf("/task/%d", id)
 	ctx.Redirect(http.StatusFound, path)
 }
