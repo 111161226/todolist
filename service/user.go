@@ -84,9 +84,11 @@ func RegisterUser(ctx *gin.Context) {
     }
 
     //check duplicate
+    tx := db.MustBegin()
     var duplicate int
-    err = db.Get(&duplicate, "SELECT COUNT(*) FROM users WHERE name=?", username)
+    err = tx.Get(&duplicate, "SELECT COUNT(*) FROM users WHERE name=?", username)
     if err != nil {
+        tx.Rollback()
         Error(http.StatusInternalServerError, err.Error())(ctx)
         return
     }
@@ -96,7 +98,7 @@ func RegisterUser(ctx *gin.Context) {
     }
  
     //preserve the data into database
-    result, err := db.Exec("INSERT INTO users(name, password) VALUES (?, ?)", username, hash(password))
+    result, err := tx.Exec("INSERT INTO users(name, password) VALUES (?, ?)", username, hash(password))
     if err != nil {
         Error(http.StatusInternalServerError, err.Error())(ctx)
         return
@@ -105,11 +107,13 @@ func RegisterUser(ctx *gin.Context) {
     //confirm state of preservation
     id, _ := result.LastInsertId()
     var user database.User
-    err = db.Get(&user, "SELECT id, name, password FROM users WHERE id = ?", id)
+    err = tx.Get(&user, "SELECT id, name, password FROM users WHERE id = ?", id)
     if err != nil {
+        tx.Rollback()
         Error(http.StatusInternalServerError, err.Error())(ctx)
         return
     }
+    tx.Commit()
     ctx.Redirect(http.StatusFound, "/list")
 }
 
